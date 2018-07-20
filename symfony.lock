@@ -77,6 +77,9 @@
     "jdorn/sql-formatter": {
         "version": "v1.2.17"
     },
+    "league/tactician": {
+        "version": "v1.0.3"
+    },
     "monolog/monolog": {
         "version": "1.23.0"
     },
@@ -97,6 +100,15 @@
     },
     "psr/simple-cache": {
         "version": "1.0.1"
+    },
+    "sensio/framework-extra-bundle": {
+        "version": "5.2",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "master",
+            "version": "5.2",
+            "ref": "fb7e19da7f013d0d422fa9bce16f5c510e27609b"
+        }
     },
     "symfony/cache": {
         "version": "v4.1.0"

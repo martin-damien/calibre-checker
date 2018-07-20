@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Entity;
+
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -34,6 +36,16 @@ final class Book
      * )
      */
     protected $tags;
+
+    /**
+     * @var Collection
+     */
+    protected $errors;
+
+    public function __construct()
+    {
+        $this->errors = new ArrayCollection();
+    }
 
     public function getTitle(): string
     {

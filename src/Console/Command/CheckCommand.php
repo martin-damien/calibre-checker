@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Command;
+namespace App\Console\Command;
 
 use App\Entity\Book;
 use App\Repository\BookRepository;
-use Doctrine\Common\Collections\Collection;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -35,14 +34,20 @@ final class CheckCommand extends ContainerAwareCommand
         $io = new SymfonyStyle($input, $output);
 
         $databasePath = sprintf('%s/metadata.db', $input->getArgument('library'));
+
+        if (!file_exists($databasePath)) {
+            $io->error('Can\'t find a database in this folder.');
+
+            die();
+        }
+
+        // Connect to database
         $this->getContainer()->get('doctrine.dbal.dynamic_connection')->forceSwitch($databasePath);
+
+        $io->title('Calibre Checker');
 
         /** @var array $books */
         $books = $this->bookRepository->findAll();
-
-        $errors = [];
-
-        $io->title('Calibre Checker');
 
         $io->progressStart(count($books));
 
@@ -56,47 +61,12 @@ final class CheckCommand extends ContainerAwareCommand
             $epubFinder = new Finder();
             $epubFinder->files()->in($folder)->name('*.epub');
 
-            if (0 === iterator_count($epubFinder)) {
-                $errors[] = [
-                    $folder,
-                    'No ePub file in this folder',
-                ];
+            /** @var SplFileInfo $epub */
+            foreach ($epubFinder as $epub) {
+                $checkZipCommand = new CheckZipCommand($epub);
 
-                continue;
             }
 
-            // @todo Handle multiple epub files
-
-            $zip = new \ZipArchive();
-            $status = $zip->open(array_values(iterator_to_array($epubFinder))[0]->getRealPath());
-
-            if (true !== $status) {
-                switch ($status) {
-                    case \ZipArchive::ER_NOZIP:
-                        $errors[] = [
-                            $folder,
-                            'ePub is not a zip',
-                        ];
-                        break;
-                    case \ZipArchive::ER_INCONS :
-                        $errors[] = [
-                            $folder,
-                            'ePub consistency check failed',
-                        ];
-                        break;
-                    case \ZipArchive::ER_CRC :
-                        $errors[] = [
-                            $folder,
-                            'ePub checksum failed',
-                        ];
-                        break;
-                    default:
-                        $errors[] = [
-                            $folder,
-                            sprintf('ePub: %s', $status),
-                        ];
-                }
-            }
         }
 
         if (count($errors) > 0) {
