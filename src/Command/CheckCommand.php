@@ -2,7 +2,10 @@
 
 namespace App\Command;
 
-use Symfony\Component\Console\Command\Command;
+use App\Entity\Book;
+use App\Repository\BookRepository;
+use Doctrine\Common\Collections\Collection;
+use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -10,8 +13,17 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 
-final class CheckCommand extends Command
+final class CheckCommand extends ContainerAwareCommand
 {
+    protected $bookRepository;
+
+    public function __construct($name = null, BookRepository $bookRepository)
+    {
+        parent::__construct($name);
+
+        $this->bookRepository = $bookRepository;
+    }
+
     protected function configure()
     {
         $this->setName('app:check');
@@ -21,26 +33,32 @@ final class CheckCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $io = new SymfonyStyle($input, $output);
+
+        $databasePath = sprintf('%s/metadata.db', $input->getArgument('library'));
+        $this->getContainer()->get('doctrine.dbal.dynamic_connection')->forceSwitch($databasePath);
+
+        /** @var array $books */
+        $books = $this->bookRepository->findAll();
+
         $errors = [];
 
         $io->title('Calibre Checker');
 
-        $foldersFinder = new Finder();
-        $foldersFinder->directories()->in($input->getArgument('library'))->name('/\([0-9]+\)$/');
+        $io->progressStart(count($books));
 
-        $io->progressStart(iterator_count($foldersFinder));
-
-        /** @var SplFileInfo $folder */
-        foreach ($foldersFinder as $folder) {
+        /** @var Book $book */
+        foreach ($books as $book) {
 
             $io->progressAdvance();
 
+            $folder = sprintf('%s/%s', $input->getArgument('library'), $book->getPath());
+
             $epubFinder = new Finder();
-            $epubFinder->files()->in($folder->getRealPath())->name('*.epub');
+            $epubFinder->files()->in($folder)->name('*.epub');
 
             if (0 === iterator_count($epubFinder)) {
                 $errors[] = [
-                    $folder->getRealPath(),
+                    $folder,
                     'No ePub file in this folder',
                 ];
 
@@ -56,25 +74,25 @@ final class CheckCommand extends Command
                 switch ($status) {
                     case \ZipArchive::ER_NOZIP:
                         $errors[] = [
-                            $folder->getRealPath(),
+                            $folder,
                             'ePub is not a zip',
                         ];
                         break;
                     case \ZipArchive::ER_INCONS :
                         $errors[] = [
-                            $folder->getRealPath(),
+                            $folder,
                             'ePub consistency check failed',
                         ];
                         break;
                     case \ZipArchive::ER_CRC :
                         $errors[] = [
-                            $folder->getRealPath(),
+                            $folder,
                             'ePub checksum failed',
                         ];
                         break;
                     default:
                         $errors[] = [
-                            $folder->getRealPath(),
+                            $folder,
                             sprintf('ePub: %s', $status),
                         ];
                 }
